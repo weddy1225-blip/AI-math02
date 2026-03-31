@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>數字雙胞胎找一找 - 數學偵探遊戲</title>
+    <style>
+        :root {
+            --bg-color: #f0f7fa;
+            --card-color: #ffffff;
+            --primary-blue: #3498db;
+            --success-green: #2ecc71;
+            --error-red: #e74c3c;
+            --text-main: #2c3e50;
+        }
+        body {
+            font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: var(--text-main);
+        }
+        .container {
+            width: 95%;
+            max-width: 650px;
+            background: var(--card-color);
+            padding: 30px;
+            border-radius: 25px;
+            box-shadow: 0 12px 45px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        /* 進度條 */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #7f8c8d;
+        }
+        .progress-container {
+            width: 100%;
+            height: 12px;
+            background: #eee;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+        #progress-bar {
+            width: 0%;
+            height: 100%;
+            background: var(--primary-blue);
+            transition: width 0.4s ease;
+        }
+        /* 算式區域 */
+        .game-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .equation-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .eq-box {
+            flex: 1;
+            padding: 30px 10px;
+            background: #f9fbfc;
+            border: 3px solid #e1e8ed;
+            border-radius: 20px;
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--text-main);
+            transition: all 0.3s;
+        }
+        .eq-box:hover { border-color: var(--primary-blue); background: #fff; }
+        .vs-icon {
+            font-size: 18px;
+            font-weight: bold;
+            color: #bdc3c7;
+            padding: 10px;
+        }
+        /* 按鈕區 */
+        .btn-group {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+        .btn {
+            padding: 18px 45px;
+            font-size: 22px;
+            font-weight: bold;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: 0.2s;
+            color: white;
+            flex: 1;
+        }
+        .btn-same { background: var(--success-green); box-shadow: 0 5px 0 #27ae60; }
+        .btn-diff { background: var(--error-red); box-shadow: 0 5px 0 #c0392b; }
+        .btn:active { transform: translateY(4px); box-shadow: none; }
+        .btn:disabled { background: #ccc; box-shadow: none; cursor: not-allowed; }
+
+        /* 反饋與結算 */
+        #feedback {
+            margin-top: 25px;
+            font-size: 20px;
+            font-weight: bold;
+            height: 30px;
+        }
+        .result-screen { display: none; }
+        .score-display { font-size: 60px; color: var(--primary-blue); margin: 20px 0; font-weight: 900; }
+        .retry-btn {
+            background: var(--primary-blue);
+            color: white;
+            padding: 15px 40px;
+            font-size: 20px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="play-screen">
+        <div class="header">
+            <span>案件進度：<span id="q-num">1</span> / 10</span>
+            <span>目前得分：<span id="score">0</span></span>
+        </div>
+        <div class="progress-container">
+            <div id="progress-bar"></div>
+        </div>
+        
+        <h2 style="margin:0;">🕵️ 數字雙胞胎找一找</h2>
+        <p style="color:#7f8c8d;">觀察兩邊的算式，「？」裡的數字有一樣嗎？</p>
+
+        <div class="equation-wrapper">
+            <div class="eq-box" id="eq-left">...</div>
+            <div class="vs-icon">VS</div>
+            <div class="eq-box" id="eq-right">...</div>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn btn-same" onclick="handleInput(true)">一樣</button>
+            <button class="btn btn-diff" onclick="handleInput(false)">不一樣</button>
+        </div>
+        <div id="feedback"></div>
+    </div>
+
+    <div id="result-screen" class="result-screen">
+        <h2>🔍 調查報告</h2>
+        <p>恭喜你完成了 10 場調查！你的得分是：</p>
+        <div class="score-display"><span id="final-score">0</span></div>
+        <p id="rank-text" style="font-size: 18px; font-weight: bold;"></p>
+        <button class="retry-btn" onclick="initGame()">再挑戰一次</button>
+    </div>
+</div>
+
+<script>
+    let score = 0;
+    let currentStep = 1;
+    let isCorrectSame = false;
+    const totalSteps = 10;
+
+    // 啟動與重新開始
+    function initGame() {
+        score = 0;
+        currentStep = 1;
+        document.getElementById('score').innerText = score;
+        document.getElementById('play-screen').style.display = 'block';
+        document.getElementById('result-screen').style.display = 'none';
+        nextQuestion();
+    }
+
+    function nextQuestion() {
+        if (currentStep > totalSteps) {
+            endGame();
+            return;
+        }
+
+        // 更新進度條與文字
+        document.getElementById('q-num').innerText = currentStep;
+        document.getElementById('progress-bar').style.width = ((currentStep - 1) / totalSteps * 100) + "%";
+        document.getElementById('feedback').innerText = "";
+        toggleButtons(true);
+
+        // 決定這題答案是一樣還不一樣
+        isCorrectSame = Math.random() > 0.5;
+        let valLeft = Math.floor(Math.random() * 15) + 2; 
+        let valRight = isCorrectSame ? valLeft : valLeft + (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 4) + 1);
+        if (valRight < 1) valRight = valLeft + 2;
+
+        // 隨機選題型
+        const type = Math.floor(Math.random() * 4);
+        let leftDisplay = "", rightDisplay = "";
+
+        if (type === 0) { // 純加法
+            let a = Math.floor(Math.random() * 40) + 10;
+            leftDisplay = `${a} + ？ = ${a + valLeft}`;
+            let b = Math.floor(Math.random() * 30) + 5;
+            rightDisplay = `${b} + ？ = ${b + valRight}`;
+        } else if (type === 1) { // 純減法
+            let a = Math.floor(Math.random() * 60) + 40;
+            leftDisplay = `${a} - ？ = ${a - valLeft}`;
+            let b = Math.floor(Math.random() * 50) + 30;
+            rightDisplay = `${b} - ？ = ${b - valRight}`;
+        } else if (type === 2) { // 加減混
+            let a = Math.floor(Math.random() * 20) + 10;
+            leftDisplay = `${a} + ？ = ${a + valLeft}`;
+            let b = Math.floor(Math.random() * 60) + 30;
+            rightDisplay = `${b} - ？ = ${b - valRight}`;
+        } else { // 加減乘除混
+            let a = Math.floor(Math.random() * 8) + 2;
+            leftDisplay = `${a} × ？ = ${a * valLeft}`;
+            let b = Math.floor(Math.random() * 20) + 10;
+            rightDisplay = `${b} + ？ = ${b + valRight}`;
+        }
+
+        document.getElementById('eq-left').innerText = leftDisplay;
+        document.getElementById('eq-right').innerText = rightDisplay;
+    }
+
+    function handleInput(userChoice) {
+        toggleButtons(false);
+        const fb = document.getElementById('feedback');
+        
+        if (userChoice === isCorrectSame) {
+            fb.innerText = "✨ 答對了！觀察入微！";
+            fb.style.color = "var(--success-green)";
+            score += 10;
+        } else {
+            fb.innerText = "❌ 答錯了，數字不合喔！";
+            fb.style.color = "var(--error-red)";
+        }
+
+        document.getElementById('score').innerText = score;
+        currentStep++;
+
+        setTimeout(nextQuestion, 1000);
+    }
+
+    function toggleButtons(status) {
+        document.querySelectorAll('.btn').forEach(b => b.disabled = !status);
+    }
+
+    function endGame() {
+        document.getElementById('play-screen').style.display = 'none';
+        document.getElementById('result-screen').style.display = 'block';
+        document.getElementById('final-score').innerText = score;
+        
+        let rank = "";
+        if (score === 100) rank = "🏆 完美結案！你是數學神探！";
+        else if (score >= 70) rank = "🥈 優良偵探！計算能力很棒！";
+        else rank = "🥉 實習偵探！再多練習一下吧！";
+        document.getElementById('rank-text').innerText = rank;
+    }
+
+    // 初始啟動
+    initGame();
+</script>
+
+</body>
+</html>
